@@ -245,11 +245,13 @@ static u8* read_file(const char* filepath, size_t* out_size) {
     return buffer;
 }
 
-u8* cart_open(const char* filepath) {
-    u8* bytes = read_file(filepath, NULL);
+u8* cart_open(const char* filepath, size_t* out_size) {
+    u8* bytes = read_file(filepath, out_size);
     if (!bytes) {
         printf("cart_open(): Failed to read file!\n");
-        return;
+        free(bytes);
+        exit(1);
+        return NULL;
     }
 
     u32 offset = 0x104;
@@ -259,7 +261,7 @@ u8* cart_open(const char* filepath) {
         if (bytes[offset] != NINTENDO_LOGO_BYTE_ARRAY[i]) {
             printf("cart_open(): Failed to find Nintendo logo at address $0104-$0133!\n");
             free(bytes);
-            return;
+            return NULL;
         }
 
         ++offset;
@@ -326,7 +328,7 @@ u8* cart_open(const char* filepath) {
     offset = 0x148;
     u8 rom_size_value = bytes[offset];
     u8 rom_size_kib = 32 * (1 << rom_size_value);
-    u8 rom_bank_count = (rom_size_kib * 1024) / 16384;
+    u8 rom_bank_count = (u8)((rom_size_kib * 1024) / 16384);
 
     printf("ROM Size Value: %u, ROM Size (KiB): %u, ROM Bank Count: %u\n", rom_size_value, rom_size_kib, rom_bank_count);
 

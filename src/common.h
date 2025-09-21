@@ -18,3 +18,13 @@
 
 #define true 1
 #define false 0
+
+#define LOBYTE(w) ((u8)(w & 0xFF))
+#define HIBYTE(w) ((u8)((w >> 8) & 0xFF))
+#define GETBIT(x, n) (((x) >> (n)) & 1)
+#define SETBIT(x, n) (x |= (1 << n))
+#define CLEARBIT(x, n) (x &= ~(1 << n))
+#define U16MSBLSB8(msb, lsb) ((msb << 8) | lsb)
+#define BETWEEN(a, b, c) ((a >= b) && (a <= c))
+
+void printaddr(u16 addr);

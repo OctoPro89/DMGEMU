@@ -380,11 +380,14 @@ u8 platform_should_run() {
 #include <string.h>
 #include <glad/glad.h>
 
+#undef APIENTRY
+
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <timeapi.h>
 
 #pragma comment(lib, "Winmm.lib")
+#pragma comment(lib, "opengl32.lib")
 
 HDC hDC;
 HGLRC hRC;
