@@ -1,21 +1,22 @@
 #include "ram.h"
+#include "bus.h"
 
-u8 wram_read(bus* b, u16 address) {
+u8 wram_read(u16 address) {
 	address -= 0xC000;
-	return b->wram[address];
+	return bus_global->wram[address];
 }
 
-void wram_write(bus* b, u16 address, u8 value) {
+void wram_write(u16 address, u8 value) {
 	address -= 0xC000;
-	b->wram[address] = value;
+	bus_global->wram[address] = value;
 }
 
-u8 hram_read(bus* b, u16 address) {
+u8 hram_read(u16 address) {
 	address -= 0xFF80;
-	return b->hram[address];
+	return bus_global->hram[address];
 }
 
-void hram_write(bus* b, u16 address, u8 value) {
+void hram_write(u16 address, u8 value) {
 	address -= 0xFF80;
-	b->hram[address] = value;
+	bus_global->hram[address] = value;
 }

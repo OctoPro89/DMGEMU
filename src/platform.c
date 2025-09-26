@@ -540,7 +540,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             }
             break;
     }
-    return DefWindowProc(hwnd, msg, wParam, lParam);
+    return DefWindowProcA(hwnd, msg, wParam, lParam);
 }
 
 void platform_sleep_ms(u64 ms) {
@@ -554,7 +554,7 @@ f64 platform_get_elapsed_time_ms() {
 }
 
 void platform_put_pixel(i32 x, i32 y, u8 r, u8 g, u8 b) {
-    if (x < 0 || x >= FRAMEBUFFER_WIDTH || y < 0 || y >= FRAMEBUFFER_HEIGHT) return;
+    // if (x < 0 || x >= FRAMEBUFFER_WIDTH || y < 0 || y >= FRAMEBUFFER_HEIGHT) return;
     i32 index = (y * FRAMEBUFFER_WIDTH + x) * 3;
     framebuffer[index + 0] = r;
     framebuffer[index + 1] = g;
@@ -688,7 +688,7 @@ u8 platform_open_window(i32 width, i32 height) {
     i32 windowWidth = rect.right - rect.left;
     i32 windowHeight = rect.bottom - rect.top;
 
-    LPCSTR title = "NESEMU";
+    LPCSTR title = "GBEMU";
 
     hWnd = CreateWindowExA(
         0, class_name, title,
@@ -719,6 +719,7 @@ u8 platform_open_window(i32 width, i32 height) {
     }
 
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+    glViewport(0, 0, width, height);
 
     program = createShaderProgram();
 

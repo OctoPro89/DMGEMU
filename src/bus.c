@@ -1,136 +1,112 @@
 #include "bus.h"
 #include "ram.h"
 #include "iomem.h"
+#include "dma.h"
 #include <stdio.h>
 #include <stdlib.h>
 
-bus bus_init(cpu* c, ppu* p, timer* t) {
-	bus b;
-	b.c = c;
-    b.c->_bus = &b;
-    b.p = p;
-    b.t = t;
-    b.hram = malloc(0x80);
-    b.wram = malloc(0x2000);
-	return b;
+bus* bus_global;
+
+void bus_init() {
+    bus_global = (bus*)malloc(sizeof(bus));
+    bus_global->hram = malloc(0x80);
+    bus_global->wram = malloc(0x2000);
 }
 
-void bus_unload(bus* b) {
-    if (b) {
-        if (b->hram) { free(b->hram); }
-        if (b->wram) { free(b->wram); }
+void bus_unload() {
+    if (bus_global) {
+        if (bus_global->hram) { free(bus_global->hram); }
+        if (bus_global->wram) { free(bus_global->wram); }
+        free(bus_global);
     }
 }
 
-u8 bus_read(bus* b, u16 addr) {
+u8 bus_read(u16 addr) {
     if (addr <= 0x7FFF) {
-        // Fixed bank 0
-        return b->c->cart[addr];
+        return cpu_global->cart[addr];
     }
     else if (addr <= 0x9FFF) {
-        //printf("UNSUPPORTED bus_read()!\n");
-        //exit(1);
         // VRAM
-        return 0x0; // b->c->memory[addr];
+        return ppu_read_vram(addr);
     }
     else if (addr <= 0xBFFF) {
         // Cartridge RAM (stubbed)
-        return b->c->memory[addr];
+        return cpu_global->memory[addr];
     }
     else if (addr <= 0xDFFF) {
         // Work RAM
-        return wram_read(b, addr);
+        return wram_read(addr);
     }
     else if (addr <= 0xFDFF) {
+        // Echo RAM
+        printf("UNSUPPORTED bus_write()\n");
         return 0;
     }
     else if (addr <= 0xFE9F) {
         // OAM
-        //printf("UNSUPPORTED bus_read()!\n");
-        //exit(1);
-        return 0x0; // b->c->memory[addr];
+        if (dma_transferring()) return 0xFF;
+
+        return ppu_read_oam(addr);
     }
     else if (addr <= 0xFEFF) {
         // Unusable area
-        //printf("UNSUPPORTED bus_read()!\n");
-        //exit(1);
+        printf("UNSUPPORTED bus_write()\n");
         return 0x0;
     }
     else if (addr <= 0xFF7F) {
         // I/O Registers
-        return io_read(b, addr);
+        return io_read(addr);
     }
     else if (addr == 0xFFFF) {
         // Interrupt Enable
-        return b->c->IE;
+        return cpu_global->IE;
     }
 
-    return hram_read(b, addr); // default
+    return hram_read(addr); // default
 }
 
-void bus_write(bus* b, u8 value, u16 addr) {
-    if (addr <= 0x1FFF) {
-        // RAM enable (ignore for now)
-        return;
-    }
-    else if (addr <= 0x3FFF) {
-        // ROM bank select
-        u8 bank = value & 0x1F;
-        if (bank == 0) bank = 1;
-        b->c->rom_bank = bank;
-        return;
-    }
-    else if (addr <= 0x7FFF) {
-        // Switchable ROM bank (MBC, stubbed)
-        // printf("UNSUPPORTED bus_write() to address %u!\n", addr);
-        // exit(1);
-        b->c->memory[addr] = value;
-        return;
+void bus_write(u16 addr, u8 value) {
+    if (addr <= 0x7FFF) {
+        // ROM data
+        cpu_global->cart[addr] = value;
     }
     else if (addr <= 0x9FFF) {
         // VRAM
-        //printf("UNSUPPORTED bus_write() to address %u!\n", addr);
-        //exit(1);
-        return;
+        ppu_write_vram(addr, value);
     }
     else if (addr <= 0xBFFF) {
         // Cartridge RAM (stubbed)
-        b->c->memory[addr] = value;
-        return;
+        cpu_global->memory[addr] = value;
     }
     else if (addr <= 0xDFFF) {
         // Work RAM
-        wram_write(b, addr, value);
-        return;
+        wram_write(addr, value);
     }
     else if (addr <= 0xFDFF) {
         // Echo RAM
-        return;
+        printf("UNSUPPORTED bus_write()\n");
     }
     else if (addr <= 0xFE9F) {
         // OAM
-        //printf("UNSUPPORTED bus_write() to address %u!\n", addr);
-        // exit(1);
-        // b->c->memory[addr] = value;
-        return;
+        if (dma_transferring()) return;
+
+        ppu_write_oam(addr, value);
     }
     else if (addr <= 0xFEFF) {
         // Unusable
-        //printf("UNSUPPORTED bus_write() to address %u!\n", addr);
-        // exit(1);
+        printf("UNSUPPORTED bus_write()\n");
         return;
     }
     else if (addr <= 0xFF7F) {
         // I/O Registers
-        io_write(b, addr, value);
+        io_write(addr, value);
     }
     else if (addr == 0xFFFF) {
         // Interrupt Enable
-        b->c->IE = value;
-        return;
+        cpu_global->IE = value;
     }
     else {
-        hram_write(b, addr, value);
+        hram_write(addr, value);
     }
 }
 
@@ -140,9 +116,9 @@ static int msg_size = 0;
 #include <string.h>
 
 static void dbg_info(bus* b) {
-    if (bus_read(b, 0xFF02) == 0x81) {
-        char c = bus_read(b, 0xFF01);
-        bus_write(b, 0, 0xFF02);
+    if (bus_read(0xFF02) == 0x81) {
+        char c = bus_read(0xFF01);
+        bus_write(0xFF02, 0);
         dbg_msg[msg_size++] = c;
     }
 
@@ -153,36 +129,52 @@ static void dbg_info(bus* b) {
     }
 }
 
-void bus_step(bus* b) {
-    // Fetch
-    u8 opcode = bus_read(b, b->c->pc);
-    const instruction* instr = &b->c->optable[opcode];
-    cpu_print_dbg_info(b, b->c, instr);
-    b->c->pc++;
+static void cycle(u8 m_cycles) {
+    for (u8 i = 0; i < m_cycles; ++i) {
+        for (u8 n = 0; n < 4; ++n) {
+            timer_tick();
+            ppu_tick();
+        }
 
-    if (instr->func == NULL) {
-        printf("Unknown opcode 0x%02X at PC=0x%04X\n", opcode, b->c->pc - 1);
-        exit(1);
+        dma_tick();
     }
+}
 
-    // Execute
-    u8 cycles = instr->func(b->c);
+#define _CPU_DEBUG 1
 
-    b->c->cycles += cycles;
+void bus_step() {
+    if (!cpu_global->halted) {
+        // Fetch
+        u8 opcode = bus_read(cpu_global->pc);
+        const instruction* instr = &cpu_global->optable[opcode];
+#if _CPU_DEBUG
+        cpu_print_dbg_info(instr);
 
-    for (u8 i = 0; i < cycles; ++i) {
-        timer_tick(b->c, b->t);
+        if (instr->func == NULL) {
+            printf("Unknown opcode 0x%02X at PC=0x%04X\n", opcode, cpu_global->pc - 1);
+            exit(1);
+        }
+#endif
+        cpu_global->pc++;
+
+        // Execute
+        u8 cycles = instr->func();
+
+        cpu_global->cycles += cycles;
+        cycle(cycles / 4);
+    }
+    else {
+        cycle(1);
+
+        if (cpu_global->IF) cpu_global->halted = false;
     }
     
-    if (b->c->ints_enabled) {
-        cpu_handle_interrupts(b->c);
-        b->c->int_next = false;
+    if (cpu_global->ints_enabled) {
+        cpu_handle_interrupts();
+        cpu_global->int_next = false;
     }
 
-    if (b->c->int_next) {
-        b->c->ints_enabled = true;
+    if (cpu_global->int_next) {
+        cpu_global->ints_enabled = true;
     }
-
-    ppu_step(b->p);
-    dbg_info(b);
 }

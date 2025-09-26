@@ -1,81 +1,83 @@
 #include "timer.h"
 #include "cpu.h"
+#include "interrupts.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-timer timer_init() {
-    timer t;
-    memset(&t, 0, sizeof(timer));
-    t.div = 0xAC00;
-    return t;
+timer* timer_global;
+
+void timer_init() {
+    timer_global = (timer*)malloc(sizeof(timer));
+    memset(timer_global, 0, sizeof(timer));
+    timer_global->div = 0xAC00;
 }
 
-void timer_tick(cpu* c, timer* t) {
-    u16 prev_div = t->div;
+void timer_tick() {
+    u16 prev_div = timer_global->div;
 
-    ++t->div;
+    ++timer_global->div;
     bool timer_update = false;
 
-    switch (t->tac & (0b11)) {
+    switch (timer_global->tac & (0b11)) {
         case 0b00:
-            timer_update = (prev_div & (1 << 9)) && (!(t->div & (1 << 9)));
+            timer_update = (prev_div & (1 << 9)) && (!(timer_global->div & (1 << 9)));
             break;
         case 0b01:
-            timer_update = (prev_div & (1 << 3)) && (!(t->div & (1 << 3)));
+            timer_update = (prev_div & (1 << 3)) && (!(timer_global->div & (1 << 3)));
             break;
         case 0b10:
-            timer_update = (prev_div & (1 << 5)) && (!(t->div & (1 << 5)));
+            timer_update = (prev_div & (1 << 5)) && (!(timer_global->div & (1 << 5)));
             break;
         case 0b11:
-            timer_update = (prev_div & (1 << 7)) && (!(t->div & (1 << 7)));
+            timer_update = (prev_div & (1 << 7)) && (!(timer_global->div & (1 << 7)));
             break;
     }
 
-    if (timer_update && t->tac & (1 << 2)) {
-        ++t->tima;
+    if (timer_update && timer_global->tac & (1 << 2)) {
+        ++timer_global->tima;
 
-        if (t->tima == 0xFF) {
-            t->tima = t->tma;
-            c->IF |= 4;
+        if (timer_global->tima == 0xFF) {
+            timer_global->tima = timer_global->tma;
+            cpu_global->IF |= INT_TIMER;
         }
     }
 }
 
-void timer_write(timer* t, u16 address, u8 value) {
+void timer_write(u16 address, u8 value) {
     switch (address) {
     case 0xFF04:
         //DIV
-        t->div = 0;
+        timer_global->div = 0;
         break;
 
     case 0xFF05:
         //TIMA
-        t->tima = value;
+        timer_global->tima = value;
         break;
 
     case 0xFF06:
         //TMA
-        t->tma = value;
+        timer_global->tma = value;
         break;
 
     case 0xFF07:
         //TAC
-        t->tac = value;
+        timer_global->tac = value;
         break;
     }
 }
 
-u8 timer_read(timer* t, u16 address) {
+u8 timer_read(u16 address) {
     switch (address) {
         case 0xFF04:
-            return t->div >> 8;
+            return timer_global->div >> 8;
         case 0xFF05:
-            return t->tima;
+            return timer_global->tima;
         case 0xFF06:
-            return t->tma;
+            return timer_global->tma;
         case 0xFF07:
-            return t->tac;
+            return timer_global->tac;
     }
 
     printf("DISSALOWED timer_read() ADDRESS!\n");

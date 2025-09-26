@@ -3,5 +3,5 @@
 #include "common.h"
 #include "bus.h"
 
-u8 io_read(bus* b, u16 addr);
-void io_write(bus* b, u16 addr, u8 value);
+u8 io_read(u16 addr);
+void io_write(u16 addr, u8 value);

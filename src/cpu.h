@@ -37,17 +37,17 @@ typedef struct {
 } cpu;
 
 // helpers macros for 16-bit registers
-#define AF(cpu) (((cpu)->a << 8) | (cpu)->f)
-#define BC(cpu) (((cpu)->b << 8) | (cpu)->c)
-#define DE(cpu) (((cpu)->d << 8) | (cpu)->e)
-#define HL(cpu) (((cpu)->h << 8) | (cpu)->l)
+#define AF() (((cpu_global)->a << 8) | (cpu_global)->f)
+#define BC() (((cpu_global)->b << 8) | (cpu_global)->c)
+#define DE() (((cpu_global)->d << 8) | (cpu_global)->e)
+#define HL() (((cpu_global)->h << 8) | (cpu_global)->l)
 
-#define SET_AF(cpu, val) { u16 tmp = val; ((cpu)->a = (tmp) >> 8, (cpu)->f = (tmp) & 0xF0); }
-#define SET_BC(cpu, val) { u16 tmp = val; ((cpu)->b = (tmp) >> 8, (cpu)->c = tmp & 0xFF);   }
-#define SET_DE(cpu, val) { u16 tmp = val; ((cpu)->d = (tmp) >> 8, (cpu)->e = tmp & 0xFF);   }
-#define SET_HL(cpu, val) { u16 tmp = val; ((cpu)->h = (tmp) >> 8, (cpu)->l = tmp & 0xFF);   }
+#define SET_AF(val) { u16 tmp = val; ((cpu_global)->a = (tmp) >> 8, (cpu_global)->f = (tmp) & 0xF0); }
+#define SET_BC(val) { u16 tmp = val; ((cpu_global)->b = (tmp) >> 8, (cpu_global)->c = tmp & 0xFF);   }
+#define SET_DE(val) { u16 tmp = val; ((cpu_global)->d = (tmp) >> 8, (cpu_global)->e = tmp & 0xFF);   }
+#define SET_HL(val) { u16 tmp = val; ((cpu_global)->h = (tmp) >> 8, (cpu_global)->l = tmp & 0xFF);   }
 
-typedef u8(*cpu_inst)(cpu* _cpu);
+typedef u8(*cpu_inst)();
 
 typedef struct instruction {
     cpu_inst func;
@@ -61,7 +61,9 @@ typedef enum {
     CPU_FLAGS_C = (1 << 4)
 } cpu_flags;
 
-cpu* cpu_init(u8* cart, size_t cart_size);
-void cpu_unload(cpu* _cpu);
-void cpu_handle_interrupts(cpu* c);
-void cpu_print_dbg_info(struct bus* b, cpu* c, const instruction* cur_instr);
+void cpu_init(u8* cart, size_t cart_size);
+void cpu_unload();
+void cpu_handle_interrupts();
+void cpu_print_dbg_info(const instruction* cur_instr);
+
+extern cpu* cpu_global;

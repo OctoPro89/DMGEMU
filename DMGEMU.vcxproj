@@ -152,7 +152,9 @@
     <ClCompile Include="src\cart.c" />
     <ClCompile Include="src\common.c" />
     <ClCompile Include="src\cpu.c" />
+    <ClCompile Include="src\dma.c" />
     <ClCompile Include="src\iomem.c" />
+    <ClCompile Include="src\lcd.c" />
     <ClCompile Include="src\main.c" />
     <ClCompile Include="src\platform.c" />
     <ClCompile Include="src\ppu.c" />
@@ -166,7 +168,10 @@
     <ClInclude Include="src\cart.h" />
     <ClInclude Include="src\common.h" />
     <ClInclude Include="src\cpu.h" />
+    <ClInclude Include="src\dma.h" />
+    <ClInclude Include="src\interrupts.h" />
     <ClInclude Include="src\iomem.h" />
+    <ClInclude Include="src\lcd.h" />
     <ClInclude Include="src\platform.h" />
     <ClInclude Include="src\ppu.h" />
     <ClInclude Include="src\ram.h" />

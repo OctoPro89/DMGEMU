@@ -12,22 +12,23 @@ typedef struct {
 	u8 tac;
 } timer;
 
-timer timer_init();
-void timer_tick(cpu* c, timer* t);
+void timer_init();
+void timer_tick();
 
-void timer_write(timer* t, u16 address, u8 value);
-u8 timer_read(timer* t, u16 address);
+void timer_write(u16 address, u8 value);
+u8 timer_read(u16 address);
+
+extern timer* timer_global;
 
 typedef struct bus {
-	cpu* c;
-	ppu* p;
-	timer* t;
 	u8* wram;
 	u8* hram;
 } bus;
 
-bus bus_init(cpu* c, ppu* p, timer* t);
-void bus_unload(bus* b);
-u8 bus_read(bus* b, u16 addr);
-void bus_write(bus* b, u8 value, u16 addr);
-void bus_step(bus* b);
+void bus_init();
+void bus_unload();
+u8 bus_read(u16 addr);
+void bus_write(u16 addr, u8 value);
+void bus_step();
+
+extern bus* bus_global;
