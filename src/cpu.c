@@ -9,21 +9,21 @@ cpu* cpu_global;
 
 // -- HELPERS --
 
-static __forceinline u16 fetch_d16() {
+static INLINE u16 fetch_d16() {
     u8 lo = bus_read(cpu_global->pc++);
     u8 hi = bus_read(cpu_global->pc++);
     return (hi << 8) | lo;
 }
 
-static __forceinline u8 fetch() {
+static INLINE u8 fetch() {
     return bus_read(cpu_global->pc++);
 }
 
-static __forceinline void cpu_set_flag(cpu_flags f) { cpu_global->f |= f; }
-static __forceinline void cpu_clear_flag(cpu_flags f) { cpu_global->f &= ~f; }
-static __forceinline int cpu_get_flag(cpu_flags f) { return cpu_global->f & f; }
+static INLINE void cpu_set_flag(cpu_flags f) { cpu_global->f |= f; }
+static INLINE void cpu_clear_flag(cpu_flags f) { cpu_global->f &= ~f; }
+static INLINE int cpu_get_flag(cpu_flags f) { return cpu_global->f & f; }
 
-#define proc static __forceinline u8
+#define proc static INLINE u8
 
 // -- HELPERS --
 
@@ -2384,8 +2384,7 @@ proc RST_38() {
     cpu_global->sp -= 2;
     bus_write(cpu_global->sp, cpu_global->pc & 0xFF);            // low byte
     bus_write(cpu_global->sp + 1, (cpu_global->pc >> 8) & 0xFF); // high byte
-
-    cpu_global->pc = 0x38;
+    cpu_global->pc = 0x38;;
     return 16;
 }
 
@@ -2402,10 +2401,6 @@ proc INVALID() {
 void cpu_init(u8* cart, size_t cart_size) {
     cpu_global = malloc(sizeof(cpu));
     memset(cpu_global, 0, sizeof(cpu));
-
-    // Allocate RAM
-    cpu_global->memory = malloc(0x10000); // 64KB RAM/IO
-    memset(cpu_global->memory, 0, 0x10000);
 
     // Store cart separately
     cpu_global->cart = malloc(cart_size);
@@ -2703,9 +2698,6 @@ void cpu_init(u8* cart, size_t cart_size) {
 
 void cpu_unload() {
     if (cpu_global) {
-        if (cpu_global->memory) {
-            free(cpu_global->memory);
-        }
         if (cpu_global->optable) {
             free(cpu_global->optable);
         }

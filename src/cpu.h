@@ -16,9 +16,6 @@ typedef struct {
     u8* cart;
     u32 cart_size;
 
-    // RAM
-    u8* memory;
-
     u8 rom_bank;
 
     u64 cycles;

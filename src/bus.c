@@ -2,6 +2,7 @@
 #include "ram.h"
 #include "iomem.h"
 #include "dma.h"
+#include "cart.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -23,24 +24,23 @@ void bus_unload() {
 
 u8 bus_read(u16 addr) {
     if (addr <= 0x7FFF) {
-        return cpu_global->cart[addr];
+        return cart_read(addr);
     }
     else if (addr <= 0x9FFF) {
         // VRAM
         return ppu_read_vram(addr);
     }
     else if (addr <= 0xBFFF) {
-        // Cartridge RAM (stubbed)
-        return cpu_global->memory[addr];
+        // Cartridge RAM
+        return cart_read(addr);
     }
     else if (addr <= 0xDFFF) {
         // Work RAM
         return wram_read(addr);
     }
     else if (addr <= 0xFDFF) {
-        // Echo RAM
-        printf("UNSUPPORTED bus_write()\n");
-        return 0;
+        // Echo RAM (E000-FDFF maps to C000-DDFF)
+        return wram_read(addr - 0x2000);
     }
     else if (addr <= 0xFE9F) {
         // OAM
@@ -50,8 +50,8 @@ u8 bus_read(u16 addr) {
     }
     else if (addr <= 0xFEFF) {
         // Unusable area
-        printf("UNSUPPORTED bus_write()\n");
-        return 0x0;
+        // printf("UNSUPPORTED bus_write()\n");
+        return 0xFF;
     }
     else if (addr <= 0xFF7F) {
         // I/O Registers
@@ -68,23 +68,24 @@ u8 bus_read(u16 addr) {
 void bus_write(u16 addr, u8 value) {
     if (addr <= 0x7FFF) {
         // ROM data
-        cpu_global->cart[addr] = value;
+        // cpu_global->cart[addr] = value;
+        cart_write(addr, value);
+        return;
     }
     else if (addr <= 0x9FFF) {
         // VRAM
         ppu_write_vram(addr, value);
     }
     else if (addr <= 0xBFFF) {
-        // Cartridge RAM (stubbed)
-        cpu_global->memory[addr] = value;
+        cart_write(addr, value);
     }
     else if (addr <= 0xDFFF) {
         // Work RAM
         wram_write(addr, value);
     }
     else if (addr <= 0xFDFF) {
-        // Echo RAM
-        printf("UNSUPPORTED bus_write()\n");
+        // Echo RAM (E000-FDFF maps to C000-DDFF)
+        wram_write(addr - 0x2000, value);
     }
     else if (addr <= 0xFE9F) {
         // OAM
@@ -94,7 +95,7 @@ void bus_write(u16 addr, u8 value) {
     }
     else if (addr <= 0xFEFF) {
         // Unusable
-        printf("UNSUPPORTED bus_write()\n");
+        // printf("UNSUPPORTED bus_write()\n");
         return;
     }
     else if (addr <= 0xFF7F) {
@@ -115,7 +116,7 @@ static int msg_size = 0;
 
 #include <string.h>
 
-static void dbg_info(bus* b) {
+static void dbg_info() {
     if (bus_read(0xFF02) == 0x81) {
         char c = bus_read(0xFF01);
         bus_write(0xFF02, 0);
@@ -142,16 +143,22 @@ static void cycle(u8 m_cycles) {
 
 #define _CPU_DEBUG 1
 
+#if _CPU_DEBUG
+    #include "platform.h"
+#endif
+
 void bus_step() {
     if (!cpu_global->halted) {
         // Fetch
         u8 opcode = bus_read(cpu_global->pc);
         const instruction* instr = &cpu_global->optable[opcode];
 #if _CPU_DEBUG
-        cpu_print_dbg_info(instr);
+        if (platform_key_down(PLATFORM_KEY_F))
+            cpu_print_dbg_info(instr);
 
         if (instr->func == NULL) {
             printf("Unknown opcode 0x%02X at PC=0x%04X\n", opcode, cpu_global->pc - 1);
+            __debugbreak();
             exit(1);
         }
 #endif

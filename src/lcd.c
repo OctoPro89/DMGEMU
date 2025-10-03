@@ -41,7 +41,7 @@ u8 lcd_read(u16 addr) {
 }
 
 static void update_palette(u8 palette_data, u8 pal) {
-	u32* p_colors = lcd_global->bg_colors;
+	u8* p_colors = lcd_global->bg_colors;
 
 	switch (pal) {
 		case 1: {
@@ -55,7 +55,7 @@ static void update_palette(u8 palette_data, u8 pal) {
 	}
 
 	p_colors[0] = colors[palette_data & 0b11];
-	p_colors[1] = colors[(palette_data >> 2)& 0b11];
+	p_colors[1] = colors[(palette_data >> 2) & 0b11];
 	p_colors[2] = colors[(palette_data >> 4) & 0b11];
 	p_colors[3] = colors[(palette_data >> 6) & 0b11];
 }

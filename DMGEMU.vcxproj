@@ -153,10 +153,11 @@
     <ClCompile Include="src\common.c" />
     <ClCompile Include="src\cpu.c" />
     <ClCompile Include="src\dma.c" />
+    <ClCompile Include="src\gamepad.c" />
     <ClCompile Include="src\iomem.c" />
     <ClCompile Include="src\lcd.c" />
     <ClCompile Include="src\main.c" />
-    <ClCompile Include="src\platform.c" />
+    <ClCompile Include="src\platform_win32.c" />
     <ClCompile Include="src\ppu.c" />
     <ClCompile Include="src\ram.c" />
     <ClCompile Include="src\timer.c" />
@@ -169,6 +170,7 @@
     <ClInclude Include="src\common.h" />
     <ClInclude Include="src\cpu.h" />
     <ClInclude Include="src\dma.h" />
+    <ClInclude Include="src\gamepad.h" />
     <ClInclude Include="src\interrupts.h" />
     <ClInclude Include="src\iomem.h" />
     <ClInclude Include="src\lcd.h" />

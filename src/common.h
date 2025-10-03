@@ -27,4 +27,10 @@
 #define U16MSBLSB8(msb, lsb) ((msb << 8) | lsb)
 #define BETWEEN(a, b, c) ((a >= b) && (a <= c))
 
+#ifdef _MSC_VER
+	#define INLINE _forceinline
+#else
+	#define INLINE inline
+#endif
+
 void printaddr(u16 addr);

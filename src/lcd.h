@@ -15,9 +15,9 @@ typedef struct {
 	u8 win_y;
 	u8 win_x;
 
-	u32 bg_colors[4];
-	u32 sp1_colors[4];
-	u32 sp2_colors[4];
+	u8 bg_colors[4];
+	u8 sp1_colors[4];
+	u8 sp2_colors[4];
 } lcd;
 
 typedef enum {

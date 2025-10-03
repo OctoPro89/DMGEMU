@@ -80,7 +80,5 @@ u8 timer_read(u16 address) {
             return timer_global->tac;
     }
 
-    printf("DISSALOWED timer_read() ADDRESS!\n");
-    exit(1);
     return 0;
 }
