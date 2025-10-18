@@ -13,6 +13,10 @@ void timer_init() {
     timer_global->div = 0xAC00;
 }
 
+void timer_unload() {
+    if (timer_global) { free(timer_global); }
+}
+
 void timer_tick() {
     u16 prev_div = timer_global->div;
 

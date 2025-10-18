@@ -1,6 +1,9 @@
 #pragma once
 #include <stdint.h>
 
+#define _CRTDBG_MAP_ALLOC
+#include <crtdbg.h>
+
 #define u8 uint8_t
 #define u16 uint16_t
 #define u32 uint32_t
@@ -14,10 +17,12 @@
 #define f32 float
 #define f64 double
 
-#define bool u8
+#ifndef __cplusplus
+	#define bool u8
 
-#define true 1
-#define false 0
+	#define true 1
+	#define false 0
+#endif // __cplusplus
 
 #define LOBYTE(w) ((u8)(w & 0xFF))
 #define HIBYTE(w) ((u8)((w >> 8) & 0xFF))
@@ -31,6 +36,6 @@
 	#define INLINE _forceinline
 #else
 	#define INLINE inline
-#endif
+#endif // _MSC_VER
 
 void printaddr(u16 addr);

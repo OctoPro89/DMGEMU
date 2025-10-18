@@ -515,9 +515,7 @@ void cart_write(u16 address, u8 value) {
 void cart_battery_save(const char* filepath) {
     if (!cart_global.ram_bank) return;
 
-    char filename[1048];
-    sprintf(filename, "%s.save\000", filepath);
-    FILE* fp = fopen(filename, "wb");
+    FILE* fp = fopen(filepath, "wb");
 
     if (!fp) {
         printf("ERROR: Failed to save game to '%s'!\n", filepath);
@@ -532,9 +530,7 @@ void cart_battery_save(const char* filepath) {
 void cart_battery_load(const char* filepath) {
     if (!cart_global.ram_bank) return;
 
-    char filename[1048];
-    sprintf(filename, "%s.save\000", filepath);
-    FILE* fp = fopen(filename, "rb");
+    FILE* fp = fopen(filepath, "rb");
 
     if (!fp) {
         printf("ERROR: Failed to load game from '%s'!\n", filepath);

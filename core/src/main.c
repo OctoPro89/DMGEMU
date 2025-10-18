@@ -111,12 +111,16 @@ int main(int argc, char* argv[]) {
         }
 
         if (platform_key_down(PLATFORM_KEY_S) && cart_global.need_save) {
-            cart_battery_save((const char*)&cart_global.title[0]); // Save game
+            char filename[1048];
+            sprintf(filename, "%s.save\000", (const char*)&cart_global.title[0]);
+            cart_battery_save(filename); // Save game
             while (platform_key_down(PLATFORM_KEY_S)) { platform_poll_events(); }
         }
 
         if (platform_key_down(PLATFORM_KEY_L)) {
-            cart_battery_load((const char*)&cart_global.title[0]); // Load game
+            char filename[1048];
+            sprintf(filename, "%s.save\000", (const char*)&cart_global.title[0]);
+            cart_battery_load(filename); // Load game
             while (platform_key_down(PLATFORM_KEY_L)) { platform_poll_events(); }
         }
 
@@ -125,6 +129,7 @@ int main(int argc, char* argv[]) {
     
     lcd_unload();
     bus_unload();
+    timer_unload();
     ppu_unload();
     cpu_unload();
     cart_unload();

@@ -1,4 +1,7 @@
-bin/
-bin-int/
-.vs/
-.vscode/
+x64
+frontend/x64
+*.exe
+core/x64
+core/bin
+core/bin-int
+.vs

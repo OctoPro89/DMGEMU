@@ -13,6 +13,7 @@ typedef struct {
 } timer;
 
 void timer_init();
+void timer_unload();
 void timer_tick();
 
 void timer_write(u16 address, u8 value);

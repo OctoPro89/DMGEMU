@@ -2701,6 +2701,9 @@ void cpu_unload() {
         if (cpu_global->optable) {
             free(cpu_global->optable);
         }
+        if (cpu_global->cart) {
+            free(cpu_global->cart);
+        }
         free(cpu_global);
     }
 }
