@@ -3,6 +3,7 @@
 #include "platform.h"
 #include "lcd.h"
 #include "gamepad.h"
+#include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -82,11 +83,37 @@ static void input() {
 }
 
 int main(int argc, char* argv[]) {
-    cart_open(argc == 2 ? argv[1] : "C:/users/vince/downloads/tetris.gb");
-    cpu_init(cart_global.rom, cart_global.rom_size);
+    cart_open(argc == 2 ? argv[1] : "C:/users/vince/downloads/pokemon_blue.gb");
+    cpu_init();
     ppu_init();
     timer_init();
     bus_init();
+
+    // Fake bios
+    {
+        // Turning on double speed here fixes glitches in pokemon
+        SET_AF(0x01B0);
+        SET_BC(0x0000);
+        SET_DE(0xFF56);
+        SET_HL(0x000D);
+        cpu_global->sp = 0xDFF0;
+        cpu_global->pc = 0x0100;
+
+        bus_write(0xFF40, 0x91); // LCDC ON
+        bus_write(0xFF41, 0x00); // STAT
+        bus_write(0xFF42, 0x00); // SCY
+        bus_write(0xFF43, 0x00); // SCX
+        bus_write(0xFF44, 0x00); // LY
+        bus_write(0xFF40, 0x00); // LCD OFF
+        bus_write(0xFF40, 0x91); // LCD ON
+
+
+        cpu_global->IE = 0;
+        cpu_global->IF = 0;
+
+        memset(bus_global->wram, 0, 0x2000);
+        memset(bus_global->hram, 0, 0x80);
+    }
 
     platform_init();
 
@@ -96,6 +123,8 @@ int main(int argc, char* argv[]) {
     tile_wnd = platform_create_window("PPU Tiles", 16 * 8 * 4, 24 * 8 * 4, false, 16 * 8, 24 * 8);
     if (!tile_wnd) { printf("Failed to create tile viewer!\n"); exit(1); }
 
+    platform_set_vsync(true);
+
     render();
 
     u64 prev_frame = 0;
@@ -103,10 +132,11 @@ int main(int argc, char* argv[]) {
     while (!platform_window_should_close(wnd) &&
         !platform_window_should_close(tile_wnd)) {
         input();
-        platform_poll_events();
+        //platform_poll_events();
         bus_step();
 
         if (prev_frame != ppu_global->current_frame) {
+            platform_poll_events();
             render();
         }
 

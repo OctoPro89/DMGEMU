@@ -68,7 +68,6 @@ u8 bus_read(u16 addr) {
 void bus_write(u16 addr, u8 value) {
     if (addr <= 0x7FFF) {
         // ROM data
-        // cpu_global->cart[addr] = value;
         cart_write(addr, value);
         return;
     }
@@ -132,11 +131,8 @@ static void dbg_info() {
 
 static void cycle(u8 m_cycles) {
     for (u8 i = 0; i < m_cycles; ++i) {
-        for (u8 n = 0; n < 4; ++n) {
-            timer_tick();
-            ppu_tick();
-        }
-
+        timer_tick();
+        ppu_tick();
         dma_tick();
     }
 }

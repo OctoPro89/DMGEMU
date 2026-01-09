@@ -13,9 +13,6 @@ typedef struct {
     u16 pc;
     u16 sp;
 
-    u8* cart;
-    u32 cart_size;
-
     u8 rom_bank;
 
     u64 cycles;
@@ -58,7 +55,7 @@ typedef enum {
     CPU_FLAGS_C = (1 << 4)
 } cpu_flags;
 
-void cpu_init(u8* cart, size_t cart_size);
+void cpu_init();
 void cpu_unload();
 void cpu_handle_interrupts();
 void cpu_print_dbg_info(const instruction* cur_instr);

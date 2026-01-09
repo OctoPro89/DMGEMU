@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -157,6 +157,9 @@
     <ClCompile Include="src\iomem.c" />
     <ClCompile Include="src\lcd.c" />
     <ClCompile Include="src\main.c" />
+    <ClCompile Include="src\mappers\mapper_mbc1.c" />
+    <ClCompile Include="src\mappers\mapper_mbc3.c" />
+    <ClCompile Include="src\mappers\mapper_rom_only.c" />
     <ClCompile Include="src\platform_win32.c" />
     <ClCompile Include="src\ppu.c" />
     <ClCompile Include="src\ram.c" />
@@ -174,6 +177,10 @@
     <ClInclude Include="src\interrupts.h" />
     <ClInclude Include="src\iomem.h" />
     <ClInclude Include="src\lcd.h" />
+    <ClInclude Include="src\mappers\mapper.h" />
+    <ClInclude Include="src\mappers\mapper_mbc1.h" />
+    <ClInclude Include="src\mappers\mapper_mbc3.h" />
+    <ClInclude Include="src\mappers\mapper_rom_only.h" />
     <ClInclude Include="src\platform.h" />
     <ClInclude Include="src\ppu.h" />
     <ClInclude Include="src\ram.h" />

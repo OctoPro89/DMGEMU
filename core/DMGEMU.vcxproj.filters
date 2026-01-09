@@ -57,6 +57,15 @@
     <ClCompile Include="src\platform_win32.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\mappers\mapper_mbc1.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\mappers\mapper_rom_only.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\mappers\mapper_mbc3.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\cart.h">
@@ -102,6 +111,18 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\platform.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\mappers\mapper.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\mappers\mapper_rom_only.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\mappers\mapper_mbc1.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\mappers\mapper_mbc3.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

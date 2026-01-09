@@ -2384,7 +2384,7 @@ proc RST_38() {
     cpu_global->sp -= 2;
     bus_write(cpu_global->sp, cpu_global->pc & 0xFF);            // low byte
     bus_write(cpu_global->sp + 1, (cpu_global->pc >> 8) & 0xFF); // high byte
-    cpu_global->pc = 0x38;;
+    cpu_global->pc = 0x38;
     return 16;
 }
 
@@ -2398,14 +2398,11 @@ proc INVALID() {
 
 // -- INSTRUCTIONS --
 
-void cpu_init(u8* cart, size_t cart_size) {
+void cpu_init() {
     cpu_global = malloc(sizeof(cpu));
     memset(cpu_global, 0, sizeof(cpu));
 
     // Store cart separately
-    cpu_global->cart = malloc(cart_size);
-    memcpy(cpu_global->cart, cart, cart_size);
-    cpu_global->cart_size = (u32)cart_size;
     cpu_global->rom_bank = 1;
 
     // PC starts at 0x0100
@@ -2700,9 +2697,6 @@ void cpu_unload() {
     if (cpu_global) {
         if (cpu_global->optable) {
             free(cpu_global->optable);
-        }
-        if (cpu_global->cart) {
-            free(cpu_global->cart);
         }
         free(cpu_global);
     }

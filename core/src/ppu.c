@@ -7,15 +7,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-static INLINE bool window_visible() {
-    return LCDC_WINDOW_ENABLE && lcd_global->win_x >= 0 && lcd_global->win_x <= 166 && lcd_global->win_y >= 0 && lcd_global->win_y <= PPU_YRES;
+static INLINE bool window_active_on_line() {
+    return LCDC_WINDOW_ENABLE &&
+        lcd_global->ly >= lcd_global->win_y &&
+        lcd_global->win_x >= 7;
 }
 
 static INLINE void inc_ly() {
-    if (window_visible() && lcd_global->ly >= lcd_global->win_y && lcd_global->ly < lcd_global->win_y + PPU_YRES) {
-        ++ppu_global->window_line;
-    }
-
     ++lcd_global->ly;
 
     if (lcd_global->ly == lcd_global->ly_compare) {
@@ -180,18 +178,33 @@ static void pipeline_load_sprite_data(u8 offset) {
 }
 
 static void pipeline_load_window_tile() {
-    if (!window_visible()) return;
+    // Window must be enabled and active on this scanline
+    if (!window_active_on_line()) return;
 
-    if (ppu_global->pf.fetch_x + 7 >= lcd_global->win_x && ppu_global->pf.fetch_x + 7 < lcd_global->win_x + PPU_YRES + 14) {
-        if (lcd_global->ly >= lcd_global->win_y && lcd_global->ly < lcd_global->win_y + PPU_XRES) {
-            u8 w_tile_y = ppu_global->window_line / 8;
-            ppu_global->pf.bgw_fetch_data[0] = bus_read(LCDC_WINDOW_TILE_MAP_AREA + ((ppu_global->pf.fetch_x + 7 - lcd_global->win_x) / 8) + (w_tile_y * 32));
+    int wx = lcd_global->win_x - 7;
 
-            if (LCDC_BG_WINDOW_TILES == 0x8800) {
-                ppu_global->pf.bgw_fetch_data[0] += 128;
-            }
-        }
+    // Are we fetching pixels that belong to the window?
+    if (ppu_global->pf.fetch_x + 7 < wx) return;
+
+    // Window X/Y in tile space
+    int win_x = (ppu_global->pf.fetch_x + 7) - wx;
+    int win_tile_x = win_x / 8;
+    int win_tile_y = ppu_global->window_line / 8;
+
+    // Fetch tile index from window tile map
+    u16 tile_map_addr =
+        LCDC_WINDOW_TILE_MAP_AREA +
+        (win_tile_y * 32) +
+        win_tile_x;
+
+    u8 tile = bus_read(tile_map_addr);
+
+    // Handle signed tile indices if using 0x8800
+    if (LCDC_BG_WINDOW_TILES == 0x8800) {
+        tile += 128;
     }
+
+    ppu_global->pf.bgw_fetch_data[0] = tile;
 }
 
 static void pipeline_fetch() {
@@ -246,10 +259,24 @@ static void pipeline_push_pixel() {
     if (ppu_global->pf.pixel_fifo.size > 8) {
         u8 pixel_data = pixel_fifo_pop();
 
-        if (ppu_global->pf.line_x >= (lcd_global->scroll_x % 8)) {
-            ppu_global->video_buffer[ppu_global->pf.pushed_x + (lcd_global->ly * PPU_XRES)] = pixel_data;
+        int screen_x = ppu_global->pf.line_x;
+        int wx = lcd_global->win_x - 7;
+
+        bool window_pixel =
+            window_active_on_line() &&
+            screen_x >= wx;
+
+        if (screen_x >= (lcd_global->scroll_x % 8)) {
+            ppu_global->video_buffer[
+                ppu_global->pf.pushed_x +
+                    (lcd_global->ly * PPU_XRES)
+            ] = pixel_data;
 
             ++ppu_global->pf.pushed_x;
+
+            if (window_pixel) {
+                ppu_global->window_drawn_this_line = true;
+            }
         }
 
         ++ppu_global->pf.line_x;
@@ -257,9 +284,27 @@ static void pipeline_push_pixel() {
 }
 
 static void pipeline_process() {
-    ppu_global->pf.map_y = (lcd_global->ly + lcd_global->scroll_y);
-    ppu_global->pf.map_x = (ppu_global->pf.fetch_x + lcd_global->scroll_x);
-    ppu_global->pf.tile_y = ((lcd_global->ly + lcd_global->scroll_y) % 8) * 2;
+    bool using_window = false;
+
+    if (window_active_on_line()) {
+        int wx = lcd_global->win_x - 7;
+        if (ppu_global->pf.fetch_x >= wx) {
+            using_window = true;
+        }
+    }
+
+    if (using_window) {
+        // Window ignores scroll registers
+        ppu_global->pf.map_x = ppu_global->pf.fetch_x;
+        ppu_global->pf.map_y = ppu_global->window_line;
+        ppu_global->pf.tile_y = (ppu_global->window_line % 8) * 2;
+    }
+    else {
+        // Normal BG behavior
+        ppu_global->pf.map_x = ppu_global->pf.fetch_x + lcd_global->scroll_x;
+        ppu_global->pf.map_y = lcd_global->ly + lcd_global->scroll_y;
+        ppu_global->pf.tile_y = ((lcd_global->ly + lcd_global->scroll_y) % 8) * 2;
+    }
 
     if (!(ppu_global->line_ticks & 1)) {
         pipeline_fetch();
@@ -356,6 +401,12 @@ static void ppu_mode_transfer() {
     pipeline_process();
 
     if (ppu_global->pf.pushed_x >= PPU_XRES) {
+        if (ppu_global->window_drawn_this_line) {
+            ppu_global->window_line++;
+        }
+
+        ppu_global->window_drawn_this_line = false;
+
         pipeline_fifo_reset();
         LCDS_MODE_SET(MODE_HBLANK);
 

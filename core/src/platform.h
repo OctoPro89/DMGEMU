@@ -113,6 +113,9 @@ extern "C" {
     // ----------------------------------------
     // Rendering
     // ----------------------------------------
+    
+    // Sets vsync on all windows
+    void platform_set_vsync(bool enabled);
 
     // Set a single pixel in the window's framebuffer
     void platform_put_pixel(platform_window* window, int x, int y, uint8_t r, uint8_t g, uint8_t b);
@@ -134,6 +137,16 @@ extern "C" {
     bool platform_mouse_button_down(platform_mouse_button button);
     void platform_get_mouse_pos(platform_window* window, int* x, int* y);
     void platform_get_mouse_delta(platform_window* window, int* dx, int* dy);
+
+    // ----------------------------------------
+    // Audio
+    // ----------------------------------------
+
+    bool platform_audio_init(int sample_rate);
+    void platform_audio_shutdown(void);
+
+    // Push one stereo sample (floating-point -1.0 .. 1.0)
+    void platform_audio_push(float left, float right);
 
 #ifdef __cplusplus
 }

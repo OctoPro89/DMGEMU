@@ -1,9 +1,53 @@
 #include "platform.h"
+
+#include <initguid.h>
 #include <windows.h>
 #include <windowsx.h>
+
 #include <stdlib.h>
+
 #include <string.h>
+
 #include <glad/glad.h>
+#include <mmdeviceapi.h>
+#include <audioclient.h>
+#include <avrt.h>
+
+// Audio
+#pragma comment(lib, "ole32.lib")
+#pragma comment(lib, "avrt.lib")
+#pragma comment(lib, "uuid.lib")
+
+DEFINE_GUID(CLSID_MMDeviceEnumerator,
+    0xbcde0395, 0xe52f, 0x467c, 0x8e, 0x3d, 0xc4, 0x57, 0x92, 0x91, 0x69, 0x2e);
+
+DEFINE_GUID(IID_IMMDeviceEnumerator,
+    0xa95664d2, 0x9614, 0x4f35, 0xa7, 0x46, 0xde, 0x8d, 0xb6, 0x36, 0x17, 0xe6);
+
+DEFINE_GUID(IID_IAudioClient,
+    0x1cb9ad4c, 0xdbfa, 0x4c32, 0xb1, 0x78, 0xc2, 0xf5, 0x3b, 0xd5, 0xc6, 0x86);
+
+DEFINE_GUID(IID_IAudioClient2,
+    0x726778CD, 0xF60A, 0x4eda, 0x82, 0xDE,
+    0xe4, 0x76, 0x10, 0xcd, 0x78, 0xaa);
+
+DEFINE_GUID(IID_IAudioRenderClient,
+    0xf294acfc, 0x3146, 0x4483, 0xa7, 0xbf, 0xad, 0xdc, 0xa7, 0xc2, 0x60, 0xe2);
+
+#define AUDIO_CHANNELS 2
+#define AUDIO_BUFFER_SAMPLES 16384  // ring buffer size (per channel)
+
+static float* audio_buffer;
+static volatile uint32_t audio_write_pos = 0;
+static volatile uint32_t audio_read_pos = 0;
+
+static IAudioClient* audio_client = NULL;
+static IAudioRenderClient* render_client = NULL;
+static HANDLE audio_event = NULL;
+static HANDLE audio_thread = NULL;
+static bool audio_running = false;
+
+static int g_audio_sample_rate = 44100;
 
 #pragma comment(lib, "opengl32.lib")
 
@@ -42,6 +86,10 @@ static HINSTANCE g_hInstance = NULL;
 #define MAX_WINDOWS 16
 static platform_window* g_windows[MAX_WINDOWS];
 static int g_window_count = 0;
+
+// Vsync
+typedef BOOL(WINAPI* PFNWGLSWAPINTERVALEXTPROC)(int);
+static PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT = NULL;
 
 // Shared rendering resources
 static GLuint shared_shader_program = 0;
@@ -197,6 +245,7 @@ static GLuint compile_shader(GLenum type, const char* src) {
 static void setup_window_gl(platform_window* win) {
     if (!win) return;
     wglMakeCurrent(win->hdc, win->glrc);
+    wglSwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC)wglGetProcAddress("wglSwapIntervalEXT");
 
     // Compile shaders (vertex + fragment)
     GLuint vert = compile_shader(GL_VERTEX_SHADER, vertex_shader_src);
@@ -245,6 +294,13 @@ static void setup_window_texture(platform_window* win) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, win->framebuffer_width, win->framebuffer_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, win->framebuffer);
+}
+
+void platform_set_vsync(bool enabled) {
+    for (int i = 0; i < g_window_count; ++i) {
+        wglMakeCurrent(g_windows[i]->hdc, g_windows[i]->glrc);
+        wglSwapIntervalEXT(enabled ? 1 : 0);
+    }
 }
 
 void platform_put_pixel(platform_window* window, int x, int y, uint8_t r, uint8_t g, uint8_t b) {
@@ -421,5 +477,142 @@ static platform_key win32_to_platform_key(WPARAM wParam) {
     case VK_LEFT: return PLATFORM_KEY_LEFT; case VK_RIGHT: return PLATFORM_KEY_RIGHT;
     case VK_UP: return PLATFORM_KEY_UP; case VK_DOWN: return PLATFORM_KEY_DOWN;
     default: return PLATFORM_KEY_UNKNOWN;
+    }
+}
+
+DWORD WINAPI platform_audio_thread(void* arg) {
+    DWORD task_index = 0;
+    HANDLE avrt = AvSetMmThreadCharacteristicsA("Pro Audio", &task_index);
+
+    while (audio_running) {
+        WaitForSingleObject(audio_event, INFINITE);
+
+        UINT32 padding = 0;
+        audio_client->lpVtbl->GetCurrentPadding(audio_client, &padding);
+
+        UINT32 buffer_frames;
+        audio_client->lpVtbl->GetBufferSize(audio_client, &buffer_frames);
+
+        UINT32 frames_to_write = buffer_frames - padding;
+        if (frames_to_write == 0)
+            continue;
+
+        float* out = NULL;
+        render_client->lpVtbl->GetBuffer(render_client, frames_to_write, (BYTE**)&out);
+
+        for (UINT32 i = 0; i < frames_to_write; ++i) {
+            for (int ch = 0; ch < 2; ++ch) {
+                if (audio_read_pos != audio_write_pos) {
+                    out[i * 2 + ch] = audio_buffer[audio_read_pos];
+                    audio_read_pos = (audio_read_pos + 1) % (AUDIO_BUFFER_SAMPLES * 2);
+                }
+                else {
+                    out[i * 2 + ch] = 0.0f; // underrun buffer -> silence
+                }
+            }
+        }
+
+        render_client->lpVtbl->ReleaseBuffer(render_client, frames_to_write, 0);
+    }
+
+    AvRevertMmThreadCharacteristics(avrt);
+    return 0;
+}
+
+bool platform_audio_init(int sample_rate) {
+    g_audio_sample_rate = sample_rate;
+
+    if (FAILED(CoInitialize(NULL))) { return false; }
+
+    IMMDeviceEnumerator* enumerator = NULL;
+    IMMDevice* device = NULL;
+
+    if (FAILED(CoCreateInstance(
+        &CLSID_MMDeviceEnumerator, NULL, CLSCTX_ALL,
+        &IID_IMMDeviceEnumerator, (void**)&enumerator)))
+        return false;
+
+    if (FAILED(enumerator->lpVtbl->GetDefaultAudioEndpoint(
+        enumerator, eRender, eConsole, &device)))
+        return false;
+
+    if (FAILED(device->lpVtbl->Activate(
+        device, &IID_IAudioClient2, CLSCTX_ALL, NULL, (void**)&audio_client)))
+        return false;
+
+    WAVEFORMATEX wfx = { 0 };
+    wfx.wFormatTag = WAVE_FORMAT_IEEE_FLOAT;
+    wfx.nChannels = AUDIO_CHANNELS;
+    wfx.nSamplesPerSec = sample_rate;
+    wfx.wBitsPerSample = 32;
+    wfx.nBlockAlign = wfx.nChannels * sizeof(float);
+    wfx.nAvgBytesPerSec = wfx.nSamplesPerSec * wfx.nBlockAlign;
+
+    REFERENCE_TIME buffer_duration = 50000; // ~5 ms
+
+    if (FAILED(audio_client->lpVtbl->Initialize(
+        audio_client,
+        AUDCLNT_SHAREMODE_SHARED,
+        AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
+        buffer_duration,
+        0,
+        &wfx,
+        NULL)))
+        return false;
+
+    audio_event = CreateEvent(NULL, FALSE, FALSE, NULL);
+    audio_client->lpVtbl->SetEventHandle(audio_client, audio_event);
+
+    if (FAILED(audio_client->lpVtbl->GetService(
+        audio_client, &IID_IAudioRenderClient, (void**)&render_client)))
+        return false;
+
+    audio_running = true;
+    audio_client->lpVtbl->Start(audio_client);
+
+    audio_thread = CreateThread(NULL, 0,
+        (LPTHREAD_START_ROUTINE)platform_audio_thread,
+        NULL, 0, NULL);
+
+    audio_buffer = (float*)malloc(sizeof(float) * AUDIO_BUFFER_SAMPLES * AUDIO_CHANNELS);
+
+    return true;
+}
+
+void platform_audio_push(float left, float right) {
+    uint32_t next = (audio_write_pos + 2) % (AUDIO_BUFFER_SAMPLES * 2);
+
+    // Drop sample if buffer full
+    if (next == audio_read_pos)
+        return;
+
+    audio_buffer[audio_write_pos] = left;
+    audio_buffer[audio_write_pos + 1] = right;
+    audio_write_pos = next;
+}
+
+void platform_audio_shutdown(void) {
+    audio_running = false;
+
+    if (audio_thread) {
+        WaitForSingleObject(audio_thread, INFINITE);
+        CloseHandle(audio_thread);
+    }
+
+    if (audio_client) {
+        audio_client->lpVtbl->Stop(audio_client);
+        audio_client->lpVtbl->Release(audio_client);
+    }
+
+    if (render_client)
+        render_client->lpVtbl->Release(render_client);
+
+    if (audio_event)
+        CloseHandle(audio_event);
+
+    CoUninitialize();
+
+    if (audio_buffer) {
+        free(audio_buffer);
     }
 }

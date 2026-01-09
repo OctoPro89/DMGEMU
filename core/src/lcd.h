@@ -21,10 +21,10 @@ typedef struct {
 } lcd;
 
 typedef enum {
-	MODE_VBLANK,
-	MODE_HBLANK,
-	MODE_OAM,
-	MODE_TRANSFER
+	MODE_HBLANK = 0x00,
+	MODE_VBLANK = 0x01,
+	MODE_OAM = 0x02,
+	MODE_TRANSFER = 0x03
 } lcd_mode;
 
 extern lcd* lcd_global;

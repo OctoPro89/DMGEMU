@@ -3,6 +3,10 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include "mappers/mapper_rom_only.h"
+#include "mappers/mapper_mbc1.h"
+#include "mappers/mapper_mbc3.h"
+
 cart cart_global;
 
 const u32 GB_HEADER_SIZE = 0x14D - 0x104;
@@ -247,20 +251,36 @@ static u8* read_file(const char* filepath, size_t* out_size) {
     return buffer;
 }
 
-static INLINE bool mbc1() {
-    return BETWEEN(cart_global.type, 1, 3);
-}
-
-static INLINE bool battery() {
-    return cart_global.type == 3;
+static mapper* create_mapper(u8 cart_type, u8* rom, size_t rom_size,
+    u8 ram_size_code)
+{
+    switch (cart_type) {
+    case 0x00:
+        return mapper_rom_only_create(rom, rom_size);
+    case 0x01:
+    case 0x02:
+    case 0x03:
+        return mapper_mbc1_create(rom, rom_size, ram_size_code, cart_type == 0x03);
+    case 0x0F:
+    case 0x10:
+    case 0x11:
+    case 0x12:
+    case 0x13:
+        return mapper_mbc3_create(rom, rom_size, ram_size_code, true);
+    default:
+        printf("Unsupported mapper: %02X\n", cart_type);
+        exit(1);
+    }
 }
 
 void cart_open(const char* filepath) {
     memset(&cart_global, 0, sizeof(cart));
-    cart_global.rom = read_file(filepath, &cart_global.rom_size);
-    if (!cart_global.rom) {
+
+    size_t rom_size;
+    u8* rom = read_file(filepath, &rom_size);
+    if (!rom) {
         printf("cart_open(): Failed to read file!\n");
-        free(cart_global.rom);
+        free(rom);
         exit(1);
     }
 
@@ -268,9 +288,9 @@ void cart_open(const char* filepath) {
 
     // -- NINTENDO LOGO --
     for (u32 i = 0; i < 48; ++i) {
-        if (cart_global.rom[offset] != NINTENDO_LOGO_BYTE_ARRAY[i]) {
+        if (rom[offset] != NINTENDO_LOGO_BYTE_ARRAY[i]) {
             printf("cart_open(): Failed to find Nintendo logo at address $0104-$0133!\n");
-            free(cart_global.rom);
+            free(rom);
             exit(1);
         }
 
@@ -283,7 +303,7 @@ void cart_open(const char* filepath) {
 
     // -- TITLE --
     for (u8 i = 0; i < 16; ++i) {
-        cart_global.title[i] = cart_global.rom[offset];
+        cart_global.title[i] = rom[offset];
         ++offset;
     }
     cart_global.title[15] = '\0';
@@ -292,14 +312,14 @@ void cart_open(const char* filepath) {
 
     // -- CGB FLAG --
     offset = 0x143;
-    u8 CGBFlag = cart_global.rom[offset];
+    u8 CGBFlag = rom[offset];
     const char* meaning_str = CGBFlag == 0x80 ? "Game support CGB enhancements, but is backwards compatible" : (CGBFlag == 0xC0 ? "Game support CGB only" : "Unknown CGB Flag");
     printf("CGB Flag: %u [%s]\n", CGBFlag, meaning_str);
 
     offset = 0x144;
 
     // -- NEW LICENSEE CODE --
-    const char licenseeCode[3] = { cart_global.rom[offset], cart_global.rom[offset + 1], '\0' };
+    const char licenseeCode[3] = { rom[offset], rom[offset + 1], '\0' };
     ++offset;
 
     int licensee_index = -1;
@@ -316,7 +336,7 @@ void cart_open(const char* filepath) {
 
     // -- SGB FLAG --
     offset = 0x146;
-    bool SGBFlag = cart_global.rom[offset] == 0x03;
+    bool SGBFlag = rom[offset] == 0x03;
     meaning_str = SGBFlag == true ? "Game supports SGB functions" : "Game doesn't support SGB functions";
     printf("SGB Flag: %s [%s]\n", meaning_str, SGBFlag ? "true" : "false");
 
@@ -325,7 +345,7 @@ void cart_open(const char* filepath) {
     int cart_type_index = -1;
     for (u8 i = 0; i < 28; ++i)
     {
-        if (CARTRIDGE_TYPE_KEYS[i] == cart_global.rom[offset])
+        if (CARTRIDGE_TYPE_KEYS[i] == rom[offset])
         {
             cart_type_index = i;
         }
@@ -335,14 +355,14 @@ void cart_open(const char* filepath) {
     printf("Cartridge type: %s\n", cart_type);
 
     offset = 0x148;
-    u8 rom_size_value = cart_global.rom[offset];
-    u8 rom_size_kib = 32 * (1 << rom_size_value);
-    u8 rom_bank_count = (u8)((rom_size_kib * 1024) / 16384);
+    u8 rom_size_value = rom[offset];
+    u32 rom_size_kib = 32 * (1 << rom_size_value);
+    u32 rom_bank_count = ((rom_size_kib * 1024) / 16384);
 
     printf("ROM Size Value: %u, ROM Size (KiB): %u, ROM Bank Count: %u\n", rom_size_value, rom_size_kib, rom_bank_count);
 
     offset = 0x149;
-    u8 ram_size_code = cart_global.rom[offset];
+    u8 ram_size_code = rom[offset];
     u32 ram_size = 0x00;
     const char* ram_description = NULL;
     switch (ram_size_code)
@@ -382,138 +402,53 @@ void cart_open(const char* filepath) {
     printf("RAM Size: %u [%s]\n", ram_size, ram_description);
 
     offset = 0x14A;
-    const char* dest_code = (cart_global.rom[offset] == 0x00 ? "Japan" : cart_global.rom[offset] == 0x01 ? "Overseas" : "Unknown");
+    const char* dest_code = (rom[offset] == 0x00 ? "Japan" : rom[offset] == 0x01 ? "Overseas" : "Unknown");
     printf("Destination code: %s\n", dest_code);
 
     offset = 0x14B;
-    u8 old_licensee_code = cart_global.rom[offset];
+    u8 old_licensee_code = rom[offset];
     printf("Old Licensee code (mostly irrelevant): %u\n", old_licensee_code);
 
     offset = 0x14C;
-    u8 mask_rom_ver_num = cart_global.rom[offset];
+    u8 mask_rom_ver_num = rom[offset];
     printf("Mask ROM version number: %u\n", mask_rom_ver_num);
 
     u32 checksum = 0;
     for (u32 address = 0x134; address <= 0x14C; ++address) {
-        checksum = checksum - cart_global.rom[address] - 1;
+        checksum = checksum - rom[address] - 1;
     }
 
     offset = 0x14D;
-    bool checksum_passed = cart_global.rom[offset] == (checksum & 0xFF);
+    bool checksum_passed = rom[offset] == (checksum & 0xFF);
 
     printf("Checksum %s\n", checksum_passed ? "passed" : "failed");
 
-    for (u8 i = 0; i < 16; ++i) {
-        cart_global.ram_banks[i] = 0;
-        if ((ram_size_code == 2 && i == 0) || (ram_size_code == 3 && i < 4) || (ram_size_code == 4 && i < 16) || (ram_size_code == 5 && i < 8)) {
-            cart_global.ram_banks[i] = malloc(sizeof(u8) * 0x2000);
-            memset(cart_global.ram_banks[i], 0, 0x2000);
-        }
-    }
-
-    cart_global.ram_bank = cart_global.ram_banks[0];
-    cart_global.rom_bank_x = cart_global.rom + 0x4000;
-
-    cart_global.type = (u8)cart_type_index;
-    cart_global.battery = battery();
-    cart_global.need_save = false;
-    cart_global.rom = cart_global.rom;
-
-    if (cart_global.battery) {
-        // load_battery();
-    }
+    cart_global.mapper = create_mapper(rom[0x147], rom, rom_size, ram_size_code);
+    cart_global.battery = cart_global.mapper->battery;
 }
 
-void cart_unload() {
-    if (cart_global.rom) {
-        free(cart_global.rom);
-    }
-
-    for (u8 i = 0; i < 16; ++i) {
-        if (cart_global.ram_banks[i]) free(cart_global.ram_banks[i]);
-    }
-}
-
-u8 cart_read(u16 address) {
-    if (!mbc1() || address < 0x4000) {
-        return cart_global.rom[address];
-    }
-
-    if ((address & 0xE000) == 0xA000) {
-        if (!cart_global.ram_enabled) {
-            return 0xFF;
-        }
-
-        if (!cart_global.ram_bank) {
-            return 0xFF;
-        }
-
-        return cart_global.ram_bank[address - 0xA000];
-    }
-
-    return cart_global.rom_bank_x[address - 0x4000];
-}
-
-void cart_write(u16 address, u8 value) {
-    if (!mbc1()) {
+void cart_unload(void) {
+    if (!cart_global.mapper)
         return;
-    }
 
-    if (address < 0x2000) {
-        cart_global.ram_enabled = ((value & 0xF) == 0xA);
-    }
+    u8* rom = cart_global.mapper->rom;
 
-    if ((address & 0xE000) == 0x2000) {
-        // ROM bank number
-        if (value == 0) {
-            value = 1;
-        }
+    cart_global.mapper->destroy(cart_global.mapper);
+    cart_global.mapper = NULL;
 
-        value &= 0b11111;
+    free(rom);
+}
 
-        cart_global.rom_bank_value = value;
-        cart_global.rom_bank_x = cart_global.rom + (0x4000 * cart_global.rom_bank_value);
-    }
+u8 cart_read(u16 addr) {
+    return cart_global.mapper->read(cart_global.mapper, addr);
+}
 
-    if ((address & 0xE000) == 0x4000) {
-        // RAM bank number
-        cart_global.ram_bank_value = value & 0b11;
-
-        if (cart_global.ram_banking) {
-            cart_global.ram_bank = cart_global.ram_banks[cart_global.ram_bank_value];
-        }
-    }
-
-    if ((address & 0xE000) == 0x6000) {
-        // Banking mode select
-        cart_global.banking_mode = value & 1;
-
-        cart_global.ram_banking = cart_global.banking_mode;
-
-        if (cart_global.ram_banking) {
-            cart_global.ram_bank = cart_global.ram_banks[cart_global.ram_bank_value];
-        }
-    }
-
-    if ((address & 0xE000) == 0xA000) {
-        if (!cart_global.ram_enabled) {
-            return;
-        }
-
-        if (!cart_global.ram_bank) {
-            return;
-        }
-
-        cart_global.ram_bank[address - 0xA000] = value;
-
-        if (cart_global.battery) {
-            cart_global.need_save = true;
-        }
-    }
+void cart_write(u16 addr, u8 value) {
+    cart_global.mapper->write(cart_global.mapper, addr, value);
 }
 
 void cart_battery_save(const char* filepath) {
-    if (!cart_global.ram_bank) return;
+    //if (!cart_global.ram_bank) return;
 
     FILE* fp = fopen(filepath, "wb");
 
@@ -522,13 +457,13 @@ void cart_battery_save(const char* filepath) {
         return;
     }
 
-    fwrite(cart_global.ram_bank, 0x2000, 1, fp);
+    //fwrite(cart_global.ram_bank, 0x2000, 1, fp);
     printf("Saved game to save file: '%s'\n", filepath);
     fclose(fp);
 }
 
 void cart_battery_load(const char* filepath) {
-    if (!cart_global.ram_bank) return;
+    //if (!cart_global.ram_bank) return;
 
     FILE* fp = fopen(filepath, "rb");
 
@@ -537,7 +472,7 @@ void cart_battery_load(const char* filepath) {
         return;
     }
 
-    fread(cart_global.ram_bank, 0x2000, 1, fp);
+    //fread(cart_global.ram_bank, 0x2000, 1, fp);
     printf("Loaded game from save file: '%s'\n", filepath);
     fclose(fp);
 }
