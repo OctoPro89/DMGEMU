@@ -258,28 +258,35 @@ static void pipeline_fetch() {
 static void pipeline_push_pixel() {
     if (ppu_global->pf.pixel_fifo.size > 8) {
         u8 pixel_data = pixel_fifo_pop();
-
         int screen_x = ppu_global->pf.line_x;
         int wx = lcd_global->win_x - 7;
+        bool window_active = window_active_on_line();
 
-        bool window_pixel =
-            window_active_on_line() &&
-            screen_x >= wx;
-
-        if (screen_x >= (lcd_global->scroll_x % 8)) {
-            ppu_global->video_buffer[
-                ppu_global->pf.pushed_x +
-                    (lcd_global->ly * PPU_XRES)
-            ] = pixel_data;
-
-            ++ppu_global->pf.pushed_x;
-
-            if (window_pixel) {
-                ppu_global->window_drawn_this_line = true;
-            }
+        // Skip pixels until the window starts
+        if (window_active && !ppu_global->window_drawn_this_line && screen_x < wx) {
+            ++ppu_global->pf.line_x;
+            return;
         }
 
+        // Skip pixels until BG scroll offset
+        if (!window_active && screen_x < (lcd_global->scroll_x % 8)) {
+            ++ppu_global->pf.line_x;
+            return;
+        }
+
+        // Push pixel to framebuffer
+        ppu_global->video_buffer[
+            ppu_global->pf.pushed_x +
+                (lcd_global->ly * PPU_XRES)
+        ] = pixel_data;
+
+        ++ppu_global->pf.pushed_x;
         ++ppu_global->pf.line_x;
+
+        // Mark window drawn
+        if (window_active && screen_x >= wx) {
+            ppu_global->window_drawn_this_line = true;
+        }
     }
 }
 
@@ -295,7 +302,7 @@ static void pipeline_process() {
 
     if (using_window) {
         // Window ignores scroll registers
-        ppu_global->pf.map_x = ppu_global->pf.fetch_x;
+        ppu_global->pf.map_x = ppu_global->pf.fetch_x - (lcd_global->win_x - 7);
         ppu_global->pf.map_y = ppu_global->window_line;
         ppu_global->pf.tile_y = (ppu_global->window_line % 8) * 2;
     }
