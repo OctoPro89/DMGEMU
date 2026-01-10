@@ -7,7 +7,7 @@ echo "Files:" $cFilenames
 assembly="gbemu"
 compilerFlags="-g"
 includeFlags="-Isrc -I"src/" -I"lib/glad/include""
-linkerFlags="-lGL -lxcb -lX11 -lX11-xcb -lxkbcommon -L/user/X11R6/lib"
+linkerFlags="-lGL -lxcb -lX11 -lX11-xcb -lxkbcommon -L/user/X11R6/lib -lasound -lpthread"
 defines="-D_DEBUG"
 
 echo "Building gbemu..."

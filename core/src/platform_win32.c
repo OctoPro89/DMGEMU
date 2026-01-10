@@ -1,3 +1,4 @@
+#ifdef _WIN32
 #include "platform.h"
 
 #include <initguid.h>
@@ -616,3 +617,5 @@ void platform_audio_shutdown(void) {
         free(audio_buffer);
     }
 }
+
+#endif // _WIN32

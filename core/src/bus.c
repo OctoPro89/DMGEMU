@@ -3,6 +3,7 @@
 #include "iomem.h"
 #include "dma.h"
 #include "cart.h"
+#include "apu.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -133,6 +134,7 @@ static void cycle(u8 m_cycles) {
     for (u8 i = 0; i < m_cycles; ++i) {
         timer_tick();
         ppu_tick();
+        apu_tick();
         dma_tick();
     }
 }
@@ -154,7 +156,9 @@ void bus_step() {
 
         if (instr->func == NULL) {
             printf("Unknown opcode 0x%02X at PC=0x%04X\n", opcode, cpu_global->pc - 1);
-            __debugbreak();
+            #ifdef _WIN32
+                __debugbreak();
+            #endif // _WIN32
             exit(1);
         }
 #endif

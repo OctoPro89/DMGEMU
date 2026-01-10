@@ -2,6 +2,7 @@
 #include "bus.h"
 #include "platform.h"
 #include "lcd.h"
+#include "apu.h"
 #include "gamepad.h"
 #include <string.h>
 #include <stdio.h>
@@ -86,6 +87,7 @@ int main(int argc, char* argv[]) {
     cart_open(argc == 2 ? argv[1] : "C:/users/vince/downloads/pokemon_blue.gb");
     cpu_init();
     ppu_init();
+    apu_init();
     timer_init();
     bus_init();
 
@@ -116,6 +118,22 @@ int main(int argc, char* argv[]) {
     }
 
     platform_init();
+
+    if (!platform_audio_init(48000)) {
+        printf("WARNING: Failed to initialize audio backend. Emulator will attempt reinitialization with a 44100hz sampling rate.\n");
+
+        if (!platform_audio_init(44100)) {
+            printf("ERROR: Audio backend failed to initialize with 48000hz and 44100hz samping rates. Check your audio drivers, game will run without audio features\n");
+        }
+        else {
+            apu_sampling_rate = 44100;
+            printf("Audio backend succeeded in initializing with 44100hz sampling rate\n");
+        }
+    }
+    else {
+        apu_sampling_rate = 48000;
+        printf("Audio backend succeeded in initializing with 48000hz sampling rate\n");
+    }
 
     wnd = platform_create_window("DMG Gameboy Emulator", PPU_XRES * 4, PPU_YRES * 4, false, PPU_XRES, PPU_YRES);
     if (!wnd) { printf("Failed to create main window!\n"); exit(1); }
@@ -160,6 +178,7 @@ int main(int argc, char* argv[]) {
     lcd_unload();
     bus_unload();
     timer_unload();
+    apu_unload();
     ppu_unload();
     cpu_unload();
     cart_unload();

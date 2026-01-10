@@ -1,8 +1,11 @@
 #pragma once
+#include <stddef.h>
 #include <stdint.h>
 
-#define _CRTDBG_MAP_ALLOC
-#include <crtdbg.h>
+#ifdef _WIN32
+	#define _CRTDBG_MAP_ALLOC
+	#include <crtdbg.h>
+#endif
 
 #define u8 uint8_t
 #define u16 uint16_t

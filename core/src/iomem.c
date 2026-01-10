@@ -1,6 +1,7 @@
 #include "iomem.h"
 #include "dma.h"
 #include "lcd.h"
+#include "apu.h"
 #include "gamepad.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,6 +17,10 @@ u8 io_read(u16 addr) {
 		default: {
 			if (BETWEEN(addr, 0xFF04, 0xFF07)) {
 				return timer_read(addr);
+			}
+
+			if (BETWEEN(addr, 0xFF10, 0xFF3F) || addr == 0xFF26) {
+				return apu_read(addr);
 			}
 
 			if (BETWEEN(addr, 0xFF40, 0xFF4B)) {
@@ -38,6 +43,11 @@ void io_write(u16 addr, u8 value) {
 		default: {
 			if (BETWEEN(addr, 0xFF04, 0xFF07)) {
 				timer_write(addr, value);
+			}
+
+			if (BETWEEN(addr, 0xFF10, 0xFF3F) || addr == 0xFF26) {
+				apu_write(addr, value);
+				return;
 			}
 
 			if (BETWEEN(addr, 0xFF40, 0xFF4B)) {
